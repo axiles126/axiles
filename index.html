@@ -822,9 +822,13 @@ Object.defineProperty(exports, '__esModule', { value: true });
                color:var(--dim); cursor:pointer; }
   #mapwrap { position:fixed; inset:0; z-index:1000; background:#fff; display:flex; flex-direction:column; }
   #mapwrap[hidden] { display:none; }
-  #mapbar { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); }
-  #mapcoords { flex:1; font-size:12px; color:var(--fg); font-variant-numeric:tabular-nums; }
-  #mapbar button { padding:8px 12px; }
+  #mapbar { display:flex; flex-direction:column; gap:6px; padding:10px 14px; border-bottom:1px solid var(--line); }
+  #mapcoords { font-size:13px; color:var(--fg); font-variant-numeric:tabular-nums; }
+  #mapbtns { display:flex; flex-wrap:wrap; gap:4px; }
+  #mapbtns button { padding:8px 8px; background:transparent; border:none; color:var(--fg);
+                    font-weight:600; text-transform:uppercase; letter-spacing:.5px; font-size:13px; }
+  #mapbtns button:disabled { opacity:.4; }
+  #mapbtns #mapuse { margin-left:auto; }
   #mapview { flex:1; }
   #status { margin-top:16px; font-size:12px; min-height:18px; white-space:pre-wrap;
             word-break:break-word; text-align:center; }
@@ -872,9 +876,14 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 <div id="mapwrap" hidden>
   <div id="mapbar">
-    <span id="mapcoords">Тапни на мапі</span>
-    <button id="mapcancel">Закрити</button>
-    <button id="mapuse" disabled>Вставити</button>
+    <div id="mapcoords">Тапни на мапі</div>
+    <div id="mapbtns">
+      <button id="mapgps">GPS</button>
+      <button id="mapcenter">Центр</button>
+      <button id="mapcopy">Копі</button>
+      <button id="mapcancel">Закрити</button>
+      <button id="mapuse" disabled>Вставити</button>
+    </div>
   </div>
   <div id="mapview"></div>
 </div>
@@ -1153,11 +1162,11 @@ Object.defineProperty(exports, '__esModule', { value: true });
     try { return mgrsPretty(mgrs.forward([lng, lat], 5)); }
     catch (e) { return lat.toFixed(6) + ', ' + lng.toFixed(6); }
   }
-  function setPick(lat, lng) {
+  function setPick(lat, lng, acc) {
     pickedCoords = toMGRS(lat, lng);
     if (!lmarker) lmarker = L.circleMarker([lat, lng], { radius: 8, color: '#c0392b', weight: 2, fillOpacity: 0.6 }).addTo(lmap);
     else lmarker.setLatLng([lat, lng]);
-    $('#mapcoords').textContent = pickedCoords;
+    $('#mapcoords').textContent = pickedCoords + (acc ? ' · ±' + Math.round(acc) + ' м' : '');
     $('#mapuse').disabled = false;
   }
   async function openMap() {
@@ -1165,7 +1174,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
     try { await loadLeaflet(); }
     catch (e) { $('#mapwrap').hidden = true; status(e.message, 'err'); return; }
     if (!lmap) {
-      lmap = L.map('mapview');
+      lmap = L.map('mapview', { zoomControl: false });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(lmap);
       lmap.on('click', e => setPick(e.latlng.lat, e.latlng.lng));
       lmap.setView([49.99, 36.23], 6);   // Харків / Україна за замовчуванням
@@ -1179,6 +1188,21 @@ Object.defineProperty(exports, '__esModule', { value: true });
   $('#map').addEventListener('click', openMap);
   $('#mapcancel').addEventListener('click', () => { $('#mapwrap').hidden = true; });
   $('#mapuse').addEventListener('click', () => { if (pickedCoords) insertTemplate(pickedCoords); $('#mapwrap').hidden = true; });
+  $('#mapgps').addEventListener('click', () => {
+    if (!navigator.geolocation) { $('#mapcoords').textContent = 'GPS недоступний'; return; }
+    $('#mapcoords').textContent = 'Визначаю GPS…';
+    navigator.geolocation.getCurrentPosition(
+      p => { const la = p.coords.latitude, lo = p.coords.longitude; if (lmap) lmap.setView([la, lo], 16); setPick(la, lo, p.coords.accuracy); },
+      err => { $('#mapcoords').textContent = 'GPS: ' + err.message; },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
+  $('#mapcenter').addEventListener('click', () => { if (lmarker) lmap.setView(lmarker.getLatLng(), lmap.getZoom()); });
+  $('#mapcopy').addEventListener('click', async () => {
+    if (!pickedCoords) return;
+    try { await navigator.clipboard.writeText(pickedCoords); $('#mapcoords').textContent = '✓ ' + pickedCoords; }
+    catch (e) { $('#mapcoords').textContent = pickedCoords; }
+  });
 
   // ---- PWA: service worker + встановлення ----
   if ('serviceWorker' in navigator) {
