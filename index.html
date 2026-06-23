@@ -789,14 +789,27 @@ Object.defineProperty(exports, '__esModule', { value: true });
   button:active { background:#f2f2f2; }
   button:disabled { opacity:.4; cursor:default; }
   #takeoff.flying { color:var(--err); }
+  .seg { display:flex; margin-top:16px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .seg button { flex:1; padding:10px 6px; background:transparent; border:none; color:var(--dim);
+                font:inherit; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; cursor:pointer; }
+  .seg button + button { border-left:1px solid var(--line); }
+  .seg button.on { color:var(--fg); font-weight:800; }
   .actions { margin-top:22px; }
   .actions button { width:100%; }
   .actions .row { display:flex; border-top:1px solid var(--line); }
   .actions .row button { flex:1; }
   .actions .row button + button { border-left:1px solid var(--line); }
   .actions #map { width:100%; border-top:1px solid var(--line); }
-  .actions #install { width:100%; border-top:1px solid var(--line); }
+  .actions #previewbtn { width:100%; border-top:1px solid var(--line); }
   .actions #reset { width:100%; border-top:1px solid var(--line); color:var(--dim); font-size:12px; }
+  #install { position:fixed; top:6px; left:8px; z-index:50; width:38px; height:38px; padding:0;
+             background:transparent; border:none; color:var(--fg); font-size:21px; line-height:38px;
+             text-align:center; cursor:pointer; }
+  #install[hidden] { display:none; }
+  #preview { white-space:pre-wrap; word-break:break-word; font:inherit; font-size:13px;
+             border:1px solid var(--line); padding:12px; margin-top:16px; }
+  #preview[hidden] { display:none; }
+  #preview.empty { color:var(--dim); }
   #clock { font-size:46px; line-height:1; letter-spacing:2px; text-align:center;
            margin:18px 0 8px; font-variant-numeric:tabular-nums; }
   #clock.live { color:var(--ok); }
@@ -856,6 +869,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
 </style>
 </head>
 <body>
+<button id="install" title="Встановити застосунок" hidden>⤓</button>
 <main>
   <button id="nametoggle" class="tpltoggle">Назва ▾</button>
   <div id="namebox" hidden>
@@ -878,7 +892,12 @@ Object.defineProperty(exports, '__esModule', { value: true });
   </div>
   <textarea id="comments" placeholder="Текст коментаря…"></textarea>
 
-  <label class="check"><input type="checkbox" id="shift"><span>Зміна — звіт за 24 год</span></label>
+  <label>Режим звіту</label>
+  <div id="reportmode" class="seg">
+    <button type="button" data-mode="current" class="on">Поточний</button>
+    <button type="button" data-mode="shift">Зміна 24г</button>
+    <button type="button" data-mode="week">Тиждень 7д</button>
+  </div>
 
   <div class="actions">
     <button id="takeoff">Взліт пішов</button>
@@ -887,9 +906,11 @@ Object.defineProperty(exports, '__esModule', { value: true });
       <button id="copy">Скопировать</button>
     </div>
     <button id="map">Карта</button>
-    <button id="install" hidden>Встановити застосунок</button>
+    <button id="previewbtn">Перегляд звіту</button>
     <button id="reset" class="muted">Скинути зміну</button>
   </div>
+
+  <pre id="preview" hidden></pre>
 
   <div id="status" class="dim">Откроется системное окно — выберите Signal</div>
 </main>
@@ -989,12 +1010,13 @@ Object.defineProperty(exports, '__esModule', { value: true });
   let activeRec = null;   // полёт, к которому привязан комментарий (до следующего взльоту)
 
   function saveFlights() {
-    const cut = Date.now() - DAY;
+    const cut = Date.now() - 8 * DAY;   // зберігаємо 8 діб — для тижневого звіту
     flights = flights.filter(f => f.t >= cut);
     store.set('kap_flights', JSON.stringify(flights));
     idbSet('kap_flights', flights);
   }
-  function within24() { const cut = Date.now() - DAY; return flights.filter(f => f.t >= cut); }
+  function withinDays(n) { const cut = Date.now() - n * DAY; return flights.filter(f => f.t >= cut); }
+  function within24() { return withinDays(1); }
   function count24h() { return within24().length; }
   function renderStats() { $('#stats').textContent = 'Вилетів за 24 год: ' + count24h(); }
 
@@ -1119,23 +1141,48 @@ Object.defineProperty(exports, '__esModule', { value: true });
   $('#nametoggle').addEventListener('click', () => { $('#namebox').hidden = !$('#namebox').hidden; nameToggleLabel(); });
   $('#callsign').addEventListener('input', () => { const v = $('#callsign').value; store.set('kap_name', v); idbSet('kap_name', v); nameToggleLabel(); });
   nameToggleLabel();
-  if (store.get('kap_shift') === '1') $('#shift').checked = true;
-  $('#shift').addEventListener('change', () => { const v = $('#shift').checked ? '1' : '0'; store.set('kap_shift', v); idbSet('kap_shift', v); });
+  let reportMode = store.get('kap_reportmode') || 'current';
+  function setMode(m) {
+    reportMode = m;
+    store.set('kap_reportmode', m); idbSet('kap_reportmode', m);
+    document.querySelectorAll('#reportmode button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  }
+  document.querySelectorAll('#reportmode button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  setMode(reportMode);
 
   // ---- сборка текста ----
   function buildText() {
     const name = $('#callsign').value.trim();
     const c = $('#comments').value.trim();
 
-    if ($('#shift').checked) {
-      // звіт зміни за 24 год + комментарии привязанных вылетов
+    if (reportMode === 'shift') {
+      // звіт зміни за 24 год + коментарі привʼязаних вильотів
       const within = within24();
       const lines = [name ? 'Зміна: ' + name : 'Зміна', 'Кількість вилетів: ' + within.length];
       for (const f of within) {
         const tx = (f.c || '').trim();
         if (tx) lines.push(hm(f.lt || f.t) + ' — ' + tx);
       }
-      // незакріплена нотатка (якщо друкувалась без вильоту)
+      if (c && !activeRec) lines.push(c);
+      return lines.join('\n');
+    }
+
+    if (reportMode === 'week') {
+      // тижневий звіт: підсумок за 7 діб, згруповано по днях
+      const within = withinDays(7);
+      const lines = [name ? 'Тиждень: ' + name : 'Тиждень', 'Вилетів за 7 днів: ' + within.length];
+      const days = new Map();
+      for (const f of within) {
+        const d = new Date(f.lt || f.t);
+        const key = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0');
+        if (!days.has(key)) days.set(key, []);
+        days.get(key).push(f);
+      }
+      for (const k of [...days.keys()].sort((a, b) => days.get(a)[0].t - days.get(b)[0].t)) {
+        const arr = days.get(k);
+        lines.push(k + ': ' + arr.length);
+        for (const f of arr) { const tx = (f.c || '').trim(); if (tx) lines.push('  ' + hm(f.lt || f.t) + ' — ' + tx); }
+      }
       if (c && !activeRec) lines.push(c);
       return lines.join('\n');
     }
@@ -1170,6 +1217,22 @@ Object.defineProperty(exports, '__esModule', { value: true });
     catch (e) { status('Не удалось скопировать. Текст:\n\n' + text, 'err'); }
   }
   $('#copy').addEventListener('click', copyText);
+
+  // ---- попередній перегляд згенерованого звіту ----
+  function updatePreview() {
+    const t = buildText();
+    $('#preview').textContent = t || '(порожній звіт — введи назву, коментар або зроби виліт)';
+    $('#preview').classList.toggle('empty', !t);
+  }
+  $('#previewbtn').addEventListener('click', () => {
+    const pre = $('#preview');
+    pre.hidden = !pre.hidden;
+    $('#previewbtn').textContent = pre.hidden ? 'Перегляд звіту' : 'Сховати звіт';
+    if (!pre.hidden) updatePreview();
+  });
+  // живе оновлення, поки перегляд відкритий
+  ['input', 'change', 'click'].forEach(ev =>
+    document.addEventListener(ev, () => { if (!$('#preview').hidden) updatePreview(); }));
 
   // ---- карта: вибір координат тапом, підстановка в коментар ----
   function loadLeaflet() {
@@ -1551,9 +1614,8 @@ Object.defineProperty(exports, '__esModule', { value: true });
   function flush() {
     const f = JSON.stringify(flights);
     const nm = $('#callsign').value;
-    const sh = $('#shift').checked ? '1' : '0';
-    store.set('kap_flights', f); store.set('kap_name', nm); store.set('kap_shift', sh);
-    idbSet('kap_flights', flights); idbSet('kap_name', nm); idbSet('kap_shift', sh);
+    store.set('kap_flights', f); store.set('kap_name', nm); store.set('kap_reportmode', reportMode);
+    idbSet('kap_flights', flights); idbSet('kap_name', nm); idbSet('kap_reportmode', reportMode);
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
   window.addEventListener('pagehide', flush);
@@ -1562,14 +1624,14 @@ Object.defineProperty(exports, '__esModule', { value: true });
   // ---- загрузка из IndexedDB (приоритет у более полной записи) ----
   (async function initDB() {
     try {
-      const [f, nm, sh] = await Promise.all([idbGet('kap_flights'), idbGet('kap_name'), idbGet('kap_shift')]);
+      const [f, nm, rm] = await Promise.all([idbGet('kap_flights'), idbGet('kap_name'), idbGet('kap_reportmode')]);
       const tpl = await idbGet('kap_templates');
       if (Array.isArray(f) && f.length >= flights.length) {
         flights = f.map(x => ({ t: x.t, c: x.c || '', lt: x.lt }));
       }
       if (Array.isArray(tpl) && !store.get('kap_templates')) { templates = tpl; renderTemplates(); }
       if (typeof nm === 'string' && !store.get('kap_name')) $('#callsign').value = nm;
-      if (sh === '1' && store.get('kap_shift') == null) $('#shift').checked = true;
+      if (typeof rm === 'string' && store.get('kap_reportmode') == null) setMode(rm);
     } catch (e) {}
     nameToggleLabel(); saveFlights(); renderStats();
   })();
