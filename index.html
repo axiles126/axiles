@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Report</title>
+<title>КОПІБАРА</title>
 <meta name="theme-color" content="#ffffff">
 <link rel="manifest" href="manifest.webmanifest">
 <script>
@@ -821,33 +821,35 @@ Object.defineProperty(exports, '__esModule', { value: true });
   .tpltoggle { font:inherit; font-size:12px; font-weight:700; text-transform:none; letter-spacing:0;
                padding:4px 0; margin:0 0 8px; border:none; background:transparent;
                color:var(--dim); cursor:pointer; }
-  #mapwrap { position:fixed; inset:0; z-index:1000; background:#fff; display:flex; flex-direction:column; }
+  #mapwrap { position:fixed; inset:0; z-index:1000; background:#fff; }
   #mapwrap[hidden] { display:none; }
-  #mapbar { display:flex; flex-direction:column; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line); }
-  #mapinfo { font-size:13px; color:var(--fg); font-variant-numeric:tabular-nums; }
+  #mapview { position:absolute; inset:0; }
+  #mapinfo { position:absolute; top:12px; left:14px; right:60px; z-index:1001; pointer-events:none;
+             font-size:13px; color:#111; font-variant-numeric:tabular-nums;
+             text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 4px #fff; }
   #mapbearing { color:var(--err); }
-  #maptools { display:flex; flex-wrap:wrap; gap:2px; }
-  #maptools button { flex:1; min-width:64px; padding:8px 4px; background:transparent; border:none; color:var(--fg);
-                     font:inherit; font-weight:600; text-transform:uppercase; letter-spacing:.5px; font-size:12px; cursor:pointer; }
-  #maptools button:active { background:#f2f2f2; }
-  #mapmain { display:flex; border-top:1px solid var(--line); }
-  #mapmain button { flex:1; padding:12px; background:transparent; border:none; color:var(--fg);
-                    font:inherit; font-weight:700; text-transform:uppercase; letter-spacing:1px; font-size:13px; cursor:pointer; }
-  #mapmain button:active { background:#f2f2f2; }
-  #mapmain button:disabled { opacity:.4; }
-  #mapmain button + button { border-left:1px solid var(--line); }
-  #maptune { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:4px 0; }
+  #mapctrl { position:absolute; top:8px; right:6px; z-index:1001; display:flex; flex-direction:column;
+             gap:2px; pointer-events:none; }
+  #mapctrl button { pointer-events:auto; width:44px; height:44px; padding:0; background:transparent; border:none;
+                    color:#111; font-size:23px; line-height:44px; text-align:center; cursor:pointer;
+                    text-shadow:0 0 3px #fff,0 0 4px #fff,0 0 5px #fff; }
+  #mapctrl button:active { transform:scale(.9); }
+  #mapctrl button:disabled { opacity:.3; }
+  #mapctrl #mapuse:not(:disabled) { color:var(--ok); }
+  #maptune { position:absolute; left:0; right:0; bottom:0; z-index:1002; background:rgba(255,255,255,.96);
+             border-top:1px solid var(--line); display:flex; flex-wrap:wrap; align-items:center; gap:12px;
+             padding:12px 14px; max-height:56%; overflow:auto; }
   #maptune[hidden] { display:none; }
   #maptune label { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--dim); margin:0; }
-  #maptune input[type=range] { width:110px; accent-color:#111; }
+  #maptune input[type=range] { width:120px; accent-color:#111; }
   #maptune input[type=number] { width:64px; padding:4px 6px; font-size:12px; }
   #maptune .check { gap:7px; color:var(--fg); margin:0; }
-  #maptune button { padding:4px 8px; background:transparent; border:1px solid var(--line); color:var(--fg);
-                    font:inherit; font-size:11px; cursor:pointer; text-transform:none; letter-spacing:0; }
-  #mapview { flex:1; }
+  #maptune button { padding:6px 8px; background:transparent; border:none; color:var(--fg);
+                    font:inherit; font-size:12px; font-weight:700; cursor:pointer; text-transform:none; letter-spacing:0; }
   .leaflet-control-zoom { border:none !important; box-shadow:none !important; margin:12px !important; }
-  .leaflet-control-zoom a { background:transparent !important; border:none !important; color:#111 !important;
-                            font-weight:700; width:34px; height:34px; line-height:34px; font-size:24px; }
+  .leaflet-control-zoom a { background:transparent !important; border:none !important;
+                            color:#111 !important; text-shadow:0 0 3px #fff,0 0 4px #fff;
+                            font-weight:700; width:40px; height:40px; line-height:40px; font-size:26px; }
   #status { margin-top:16px; font-size:12px; min-height:18px; white-space:pre-wrap;
             word-break:break-word; text-align:center; }
   .ok { color:var(--ok); } .err { color:var(--err); } .dim { color:var(--dim); }
@@ -893,35 +895,31 @@ Object.defineProperty(exports, '__esModule', { value: true });
 </main>
 
 <div id="mapwrap" hidden>
-  <div id="mapbar">
-    <div id="mapinfo"><span id="mapcoords">Тапни на мапі</span><span id="mapbearing"></span></div>
-    <div id="maptools">
-      <button id="mapgps">GPS</button>
-      <button id="mapfix">Фікс</button>
-      <button id="mapcenter">Центр</button>
-      <button id="mapcopy">Копі</button>
-      <button id="mapcone">Конус</button>
-    </div>
-    <div id="maptune" hidden>
-      <label>Довжина <span id="lenval">120 м</span><input type="range" id="conelen" min="20" max="15000" step="50" value="120"></label>
-      <label>Кут <span id="angval">60</span>°<input type="range" id="coneang" min="10" max="160" step="5" value="60"></label>
-      <label>Азимут <span id="azval">0</span>°<input type="range" id="coneaz" min="0" max="359" step="1" value="0"></label>
-      <label class="check"><input type="checkbox" id="conemulti"><span>Кілька конусів</span></label>
-      <label>Частота <input type="number" id="antfreq" min="100" max="60000" step="10" placeholder="МГц"></label>
-      <label>Вис. ант. <input type="number" id="anth" min="0" max="500" step="1" value="2"></label>
-      <label>Вис. цілі <input type="number" id="tgth" min="0" max="5000" step="1" value="0"></label>
-      <button id="conecompass">Компас</button>
-      <button id="conetarget">Ціль: вимк</button>
-      <button id="antbuild">Антена (рельєф)</button>
-      <button id="fixclear">Очистити точки</button>
-      <button id="antclear">Очистити антени</button>
-    </div>
-    <div id="mapmain">
-      <button id="mapcancel">Закрити</button>
-      <button id="mapuse" disabled>Вставити</button>
-    </div>
-  </div>
   <div id="mapview"></div>
+  <div id="mapinfo"><span id="mapcoords">Тапни на мапі</span><span id="mapbearing"></span></div>
+  <div id="mapctrl">
+    <button id="mapcancel" title="Закрити">✕</button>
+    <button id="mapgps" title="Моя позиція (GPS)">◎</button>
+    <button id="mapfix" title="Зафіксувати точку">⚑</button>
+    <button id="mapcenter" title="Центр на маркер">⊕</button>
+    <button id="mapcopy" title="Копіювати MGRS">⧉</button>
+    <button id="mapcone" title="Налаштування / антена">⚙</button>
+    <button id="mapuse" title="Вставити в звіт" disabled>✓</button>
+  </div>
+  <div id="maptune" hidden>
+    <label>Довжина <span id="lenval">120 м</span><input type="range" id="conelen" min="20" max="15000" step="50" value="120"></label>
+    <label>Кут <span id="angval">60</span>°<input type="range" id="coneang" min="10" max="160" step="5" value="60"></label>
+    <label>Азимут <span id="azval">0</span>°<input type="range" id="coneaz" min="0" max="359" step="1" value="0"></label>
+    <label class="check"><input type="checkbox" id="conemulti"><span>Кілька конусів</span></label>
+    <label>Частота <input type="number" id="antfreq" min="100" max="60000" step="10" placeholder="МГц"></label>
+    <label>Вис. ант. <input type="number" id="anth" min="0" max="500" step="1" value="2"></label>
+    <label>Вис. цілі <input type="number" id="tgth" min="0" max="5000" step="1" value="0"></label>
+    <button id="conecompass">Компас</button>
+    <button id="conetarget">Ціль: вимк</button>
+    <button id="antbuild">Антена (рельєф)</button>
+    <button id="fixclear">Очистити точки</button>
+    <button id="antclear">Очистити антени</button>
+  </div>
 </div>
 
 <script>
@@ -1215,7 +1213,8 @@ Object.defineProperty(exports, '__esModule', { value: true });
     try { await loadLeaflet(); }
     catch (e) { $('#mapwrap').hidden = true; status(e.message, 'err'); return; }
     if (!lmap) {
-      lmap = L.map('mapview', { zoomControl: true });
+      lmap = L.map('mapview', { zoomControl: false });
+      L.control.zoom({ position: 'bottomleft' }).addTo(lmap);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(lmap);
       fixedLayer = L.layerGroup().addTo(lmap); drawFixed();
       antLayer = L.layerGroup().addTo(lmap);
