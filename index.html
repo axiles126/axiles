@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title></title>
+<title>Report</title>
 <meta name="theme-color" content="#ffffff">
 <link rel="manifest" href="manifest.webmanifest">
 <script>
@@ -865,6 +865,17 @@ Object.defineProperty(exports, '__esModule', { value: true });
                             font-weight:700; width:40px; height:40px; line-height:40px; font-size:26px; }
   #status { margin-top:16px; font-size:12px; min-height:18px; white-space:pre-wrap;
             word-break:break-word; text-align:center; }
+  #update { position:fixed; left:0; right:0; bottom:0; z-index:2000; background:#fff;
+            border-top:1px solid var(--line); padding:14px 16px; box-shadow:0 -6px 20px rgba(0,0,0,.08); }
+  #update[hidden] { display:none; }
+  #upver { font-weight:800; letter-spacing:.5px; margin-bottom:6px; }
+  #upnotes { white-space:pre-wrap; font:inherit; font-size:13px; color:var(--fg); margin:0 0 12px; }
+  .uprow { display:flex; border-top:1px solid var(--line); }
+  .uprow button { flex:1; padding:12px; background:transparent; border:none; font:inherit; font-weight:700;
+                  text-transform:uppercase; letter-spacing:1px; cursor:pointer; }
+  .uprow button + button { border-left:1px solid var(--line); }
+  #upyes { color:var(--ok); }
+  #upyes:disabled { color:var(--dim); }
   .ok { color:var(--ok); } .err { color:var(--err); } .dim { color:var(--dim); }
 </style>
 </head>
@@ -1585,25 +1596,39 @@ Object.defineProperty(exports, '__esModule', { value: true });
   $('#conelen').value = coneR; $('#coneang').value = coneHalf * 2; $('#coneaz').value = manualAz;
   $('#lenval').textContent = fmtLen(coneR); $('#angval').textContent = coneHalf * 2; $('#azval').textContent = manualAz;
 
-  // ---- PWA: service worker + встановлення ----
+  // ---- PWA: service worker + кероване оновлення (за запитом) ----
+  function promptUpdate(worker) {
+    if (!worker) return;
+    try {
+      const mc = new MessageChannel();
+      mc.port1.onmessage = ev => {
+        const d = ev.data || {};
+        $('#upver').textContent = 'Доступне оновлення' + (d.version ? ' · ' + d.version : '');
+        $('#upnotes').textContent = (d.notes || []).map(n => '• ' + n).join('\n');
+      };
+      worker.postMessage({ type: 'getVersion' }, [mc.port2]);
+    } catch (e) {}
+    $('#update').hidden = false;
+    $('#upyes').onclick = () => { $('#upyes').disabled = true; $('#upver').textContent = 'Оновлення…'; worker.postMessage('skipWaiting'); };
+    $('#upno').onclick = () => { $('#update').hidden = true; };
+  }
   if ('serviceWorker' in navigator) {
     const hadController = !!navigator.serviceWorker.controller;
-    let refreshing = false;
+    let reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!hadController || refreshing) return;   // перший запуск — без перезавантаження
-      refreshing = true;
-      location.reload();
+      if (!hadController || reloading) return;   // перший запуск — без перезавантаження
+      reloading = true; location.reload();
     });
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').then(reg => {
-        reg.update().catch(() => {});
-        setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);  // періодична перевірка
+        if (reg.waiting && navigator.serviceWorker.controller) promptUpdate(reg.waiting);
         reg.addEventListener('updatefound', () => {
           const nw = reg.installing;
           if (nw) nw.addEventListener('statechange', () => {
-            if (nw.state === 'installed' && navigator.serviceWorker.controller) nw.postMessage('skipWaiting');
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) promptUpdate(reg.waiting || nw);
           });
         });
+        setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);  // тиха перевірка наявності оновлення
       }).catch(() => {});
     });
   }
@@ -1663,5 +1688,14 @@ Object.defineProperty(exports, '__esModule', { value: true });
   saveFlights(); renderStats();
   setInterval(() => { saveFlights(); renderStats(); }, 60000);
 </script>
+<div id="update" hidden>
+  <div id="upver">Доступне оновлення</div>
+  <pre id="upnotes"></pre>
+  <div class="uprow">
+    <button id="upno">Пізніше</button>
+    <button id="upyes">Оновити</button>
+  </div>
+</div>
+
 </body>
 </html>
