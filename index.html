@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>КОПІБАРА</title>
+<title>Report</title>
 <meta name="theme-color" content="#ffffff">
 <link rel="manifest" href="manifest.webmanifest">
 <script>
@@ -781,6 +781,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
           border:1px solid var(--line); border-radius:0; padding:10px;
           font:inherit; outline:none; }
   input:focus, textarea:focus { border-color:#999; }
+  #callsign { font-weight:700; }
   textarea { resize:vertical; min-height:100px; }
   button { padding:14px; background:transparent; color:var(--fg); border:none;
            font:inherit; font-weight:600; letter-spacing:1px; cursor:pointer;
@@ -788,14 +789,27 @@ Object.defineProperty(exports, '__esModule', { value: true });
   button:active { background:#f2f2f2; }
   button:disabled { opacity:.4; cursor:default; }
   #takeoff.flying { color:var(--err); }
+  .seg { display:flex; margin-top:16px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .seg button { flex:1; padding:10px 6px; background:transparent; border:none; color:var(--dim);
+                font:inherit; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; cursor:pointer; }
+  .seg button + button { border-left:1px solid var(--line); }
+  .seg button.on { color:var(--fg); font-weight:800; }
   .actions { margin-top:22px; }
   .actions button { width:100%; }
   .actions .row { display:flex; border-top:1px solid var(--line); }
   .actions .row button { flex:1; }
   .actions .row button + button { border-left:1px solid var(--line); }
   .actions #map { width:100%; border-top:1px solid var(--line); }
-  .actions #install { width:100%; border-top:1px solid var(--line); }
+  .actions #previewbtn { width:100%; border-top:1px solid var(--line); }
   .actions #reset { width:100%; border-top:1px solid var(--line); color:var(--dim); font-size:12px; }
+  #install { position:fixed; top:6px; right:8px; z-index:50; width:38px; height:38px; padding:0;
+             background:transparent; border:none; color:var(--fg); font-size:21px; line-height:38px;
+             text-align:center; cursor:pointer; }
+  #install[hidden] { display:none; }
+  #preview { white-space:pre-wrap; word-break:break-word; font:inherit; font-size:13px;
+             border:1px solid var(--line); padding:12px; margin-top:16px; }
+  #preview[hidden] { display:none; }
+  #preview.empty { color:var(--dim); }
   #clock { font-size:46px; line-height:1; letter-spacing:2px; text-align:center;
            margin:18px 0 8px; font-variant-numeric:tabular-nums; }
   #clock.live { color:var(--ok); }
@@ -808,7 +822,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
   .check input { width:17px; height:17px; accent-color:#111; margin:0; }
   .tpls { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; }
   .tpls[hidden], .tpladd[hidden] { display:none; }
-  .tpl { font:inherit; font-size:12px; font-weight:400; letter-spacing:0; text-transform:none;
+  .tpl { font:inherit; font-size:12px; font-weight:700; letter-spacing:0; text-transform:none;
          padding:6px 10px; margin:0; border:1px solid var(--line); background:transparent;
          color:var(--fg); cursor:pointer; }
   .tpl:active { background:#f2f2f2; }
@@ -817,30 +831,50 @@ Object.defineProperty(exports, '__esModule', { value: true });
   .tpladd { display:flex; gap:8px; margin:0 0 10px; }
   .tpladd input { flex:1; }
   .tpladd button { padding:6px 12px; }
-  .tpltoggle { font:inherit; font-size:12px; font-weight:400; text-transform:none; letter-spacing:0;
+  .tpltoggle { font:inherit; font-size:12px; font-weight:700; text-transform:none; letter-spacing:0;
                padding:4px 0; margin:0 0 8px; border:none; background:transparent;
                color:var(--dim); cursor:pointer; }
-  #mapwrap { position:fixed; inset:0; z-index:1000; background:#fff; display:flex; flex-direction:column; }
+  #mapwrap { position:fixed; inset:0; z-index:1000; background:#fff; }
   #mapwrap[hidden] { display:none; }
-  #mapbar { display:flex; flex-direction:column; gap:6px; padding:10px 14px; border-bottom:1px solid var(--line); }
-  #mapcoords { font-size:13px; color:var(--fg); font-variant-numeric:tabular-nums; }
-  #mapbtns { display:flex; flex-wrap:wrap; gap:4px; }
-  #mapbtns button { padding:8px 8px; background:transparent; border:none; color:var(--fg);
-                    font-weight:600; text-transform:uppercase; letter-spacing:.5px; font-size:13px; }
-  #mapbtns button:disabled { opacity:.4; }
-  #mapbtns #mapuse { margin-left:auto; }
-  #mapview { flex:1; }
+  #mapview { position:absolute; inset:0; }
+  #mapinfo { position:absolute; top:12px; left:14px; right:60px; z-index:1001; pointer-events:none;
+             font-size:13px; color:#111; font-variant-numeric:tabular-nums;
+             text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 4px #fff; }
+  #mapbearing { color:var(--err); }
+  #mapctrl { position:absolute; top:8px; right:6px; z-index:1001; display:flex; flex-direction:column;
+             gap:2px; pointer-events:none; }
+  #mapctrl button { pointer-events:auto; width:44px; height:44px; padding:0; background:transparent; border:none;
+                    color:#111; font-size:23px; line-height:44px; text-align:center; cursor:pointer;
+                    text-shadow:0 0 3px #fff,0 0 4px #fff,0 0 5px #fff; }
+  #mapctrl button:active { transform:scale(.9); }
+  #mapctrl button:disabled { opacity:.3; }
+  #mapctrl #mapuse:not(:disabled) { color:var(--ok); }
+  #maptune { position:absolute; left:0; right:0; bottom:0; z-index:1002; background:rgba(255,255,255,.96);
+             border-top:1px solid var(--line); display:flex; flex-wrap:wrap; align-items:center; gap:12px;
+             padding:12px 14px; max-height:56%; overflow:auto; }
+  #maptune[hidden] { display:none; }
+  #maptune label { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--dim); margin:0; }
+  #maptune input[type=range] { width:120px; accent-color:#111; }
+  #maptune input[type=number] { width:64px; padding:4px 6px; font-size:12px; }
+  #maptune .check { gap:7px; color:var(--fg); margin:0; }
+  #maptune button { padding:6px 8px; background:transparent; border:none; color:var(--fg);
+                    font:inherit; font-size:12px; font-weight:700; cursor:pointer; text-transform:none; letter-spacing:0; }
+  .leaflet-control-zoom { border:none !important; box-shadow:none !important; margin:12px !important; }
+  .leaflet-control-zoom a { background:transparent !important; border:none !important;
+                            color:#111 !important; text-shadow:0 0 3px #fff,0 0 4px #fff;
+                            font-weight:700; width:40px; height:40px; line-height:40px; font-size:26px; }
   #status { margin-top:16px; font-size:12px; min-height:18px; white-space:pre-wrap;
             word-break:break-word; text-align:center; }
   .ok { color:var(--ok); } .err { color:var(--err); } .dim { color:var(--dim); }
 </style>
 </head>
 <body>
+<button id="install" title="Встановити застосунок" hidden>⤓</button>
 <main>
-  <button id="nametoggle" class="tpltoggle">Копібара ▾</button>
+  <button id="nametoggle" class="tpltoggle">Назва ▾</button>
   <div id="namebox" hidden>
     <label for="callsign">Назва</label>
-    <input id="callsign" value="Копібара" autocomplete="off" spellcheck="false">
+    <input id="callsign" placeholder="Назва позиції" autocomplete="off" spellcheck="false">
   </div>
 
   <div id="clock">00:00</div>
@@ -858,7 +892,12 @@ Object.defineProperty(exports, '__esModule', { value: true });
   </div>
   <textarea id="comments" placeholder="Текст коментаря…"></textarea>
 
-  <label class="check"><input type="checkbox" id="shift"><span>Зміна — звіт за 24 год</span></label>
+  <label>Режим звіту</label>
+  <div id="reportmode" class="seg">
+    <button type="button" data-mode="current" class="on">Поточний</button>
+    <button type="button" data-mode="shift">Зміна 24г</button>
+    <button type="button" data-mode="week">Тиждень 7д</button>
+  </div>
 
   <div class="actions">
     <button id="takeoff">Взліт пішов</button>
@@ -867,25 +906,41 @@ Object.defineProperty(exports, '__esModule', { value: true });
       <button id="copy">Скопировать</button>
     </div>
     <button id="map">Карта</button>
-    <button id="install" hidden>Встановити застосунок</button>
+    <button id="previewbtn">Перегляд звіту</button>
     <button id="reset" class="muted">Скинути зміну</button>
   </div>
+
+  <pre id="preview" hidden></pre>
 
   <div id="status" class="dim">Откроется системное окно — выберите Signal</div>
 </main>
 
 <div id="mapwrap" hidden>
-  <div id="mapbar">
-    <div id="mapcoords">Тапни на мапі</div>
-    <div id="mapbtns">
-      <button id="mapgps">GPS</button>
-      <button id="mapcenter">Центр</button>
-      <button id="mapcopy">Копі</button>
-      <button id="mapcancel">Закрити</button>
-      <button id="mapuse" disabled>Вставити</button>
-    </div>
-  </div>
   <div id="mapview"></div>
+  <div id="mapinfo"><span id="mapcoords">Тапни на мапі</span><span id="mapbearing"></span></div>
+  <div id="mapctrl">
+    <button id="mapcancel" title="Закрити">✕</button>
+    <button id="mapgps" title="Моя позиція (GPS)">◎</button>
+    <button id="mapfix" title="Зафіксувати точку">⚑</button>
+    <button id="mapcenter" title="Центр на маркер">⊕</button>
+    <button id="mapcopy" title="Копіювати MGRS">⧉</button>
+    <button id="mapcone" title="Налаштування / антена">⚙</button>
+    <button id="mapuse" title="Вставити в звіт" disabled>✓</button>
+  </div>
+  <div id="maptune" hidden>
+    <label>Довжина <span id="lenval">120 м</span><input type="range" id="conelen" min="20" max="15000" step="50" value="120"></label>
+    <label>Кут <span id="angval">60</span>°<input type="range" id="coneang" min="10" max="160" step="5" value="60"></label>
+    <label>Азимут <span id="azval">0</span>°<input type="range" id="coneaz" min="0" max="359" step="1" value="0"></label>
+    <label class="check"><input type="checkbox" id="conemulti"><span>Кілька конусів</span></label>
+    <label>Частота <input type="number" id="antfreq" min="100" max="60000" step="10" placeholder="МГц"></label>
+    <label>Вис. ант. <input type="number" id="anth" min="0" max="500" step="1" value="2"></label>
+    <label>Вис. цілі <input type="number" id="tgth" min="0" max="5000" step="1" value="0"></label>
+    <button id="conecompass">Компас</button>
+    <button id="conetarget">Ціль: вимк</button>
+    <button id="antbuild">Антена (рельєф)</button>
+    <button id="fixclear">Очистити точки</button>
+    <button id="antclear">Очистити антени</button>
+  </div>
 </div>
 
 <script>
@@ -955,12 +1010,13 @@ Object.defineProperty(exports, '__esModule', { value: true });
   let activeRec = null;   // полёт, к которому привязан комментарий (до следующего взльоту)
 
   function saveFlights() {
-    const cut = Date.now() - DAY;
+    const cut = Date.now() - 8 * DAY;   // зберігаємо 8 діб — для тижневого звіту
     flights = flights.filter(f => f.t >= cut);
     store.set('kap_flights', JSON.stringify(flights));
     idbSet('kap_flights', flights);
   }
-  function within24() { const cut = Date.now() - DAY; return flights.filter(f => f.t >= cut); }
+  function withinDays(n) { const cut = Date.now() - n * DAY; return flights.filter(f => f.t >= cut); }
+  function within24() { return withinDays(1); }
   function count24h() { return within24().length; }
   function renderStats() { $('#stats').textContent = 'Вилетів за 24 год: ' + count24h(); }
 
@@ -1079,38 +1135,73 @@ Object.defineProperty(exports, '__esModule', { value: true });
   if (savedName) $('#callsign').value = savedName;
   function nameToggleLabel() {
     const open = !$('#namebox').hidden;
-    const nm = $('#callsign').value.trim() || 'Копібара';
+    const nm = $('#callsign').value.trim() || 'Назва';
     $('#nametoggle').textContent = nm + (open ? ' ▴' : ' ▾');
   }
   $('#nametoggle').addEventListener('click', () => { $('#namebox').hidden = !$('#namebox').hidden; nameToggleLabel(); });
   $('#callsign').addEventListener('input', () => { const v = $('#callsign').value; store.set('kap_name', v); idbSet('kap_name', v); nameToggleLabel(); });
   nameToggleLabel();
-  if (store.get('kap_shift') === '1') $('#shift').checked = true;
-  $('#shift').addEventListener('change', () => { const v = $('#shift').checked ? '1' : '0'; store.set('kap_shift', v); idbSet('kap_shift', v); });
+  let reportMode = store.get('kap_reportmode') || 'current';
+  function setMode(m) {
+    reportMode = m;
+    store.set('kap_reportmode', m); idbSet('kap_reportmode', m);
+    document.querySelectorAll('#reportmode button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  }
+  document.querySelectorAll('#reportmode button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  setMode(reportMode);
 
   // ---- сборка текста ----
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function sortieLine(f) {
+    const a = hm(f.t), b = f.lt ? hm(f.lt) : '…';
+    const dur = f.lt ? ' (' + fmt(f.lt - f.t) + ')' : '';
+    const tx = (f.c || '').trim().replace(/\n+/g, ', ');
+    return a + '–' + b + dur + (tx ? ' — ' + tx : '');
+  }
   function buildText() {
-    const name = $('#callsign').value.trim() || 'Копібара';
+    const name = $('#callsign').value.trim();
     const c = $('#comments').value.trim();
 
-    if ($('#shift').checked) {
-      // звіт зміни за 24 год + комментарии привязанных вылетов
+    if (reportMode === 'shift') {
+      // зміна за 24 год: список вильотів (взліт–сів, тривалість, коментар)
       const within = within24();
-      const lines = ['Зміна: ' + name, 'Кількість вилетів: ' + within.length];
-      for (const f of within) {
-        const tx = (f.c || '').trim();
-        if (tx) lines.push(hm(f.lt || f.t) + ' — ' + tx);
-      }
-      // незакріплена нотатка (якщо друкувалась без вильоту)
+      const lines = [name ? 'Зміна: ' + name : 'Зміна', 'Вилетів за 24 год: ' + within.length];
+      for (const f of within) lines.push(sortieLine(f));
       if (c && !activeRec) lines.push(c);
       return lines.join('\n');
     }
 
-    const lines = [name];
-    if (takeoffStr)       lines.push('Взліт: ' + takeoffStr);
-    if (landingStr)       lines.push('Сів: ' + landingStr);
+    if (reportMode === 'week') {
+      // тиждень: дні зі своїми вильотами (як добові зведення)
+      const within = withinDays(7);
+      const lines = [name ? 'Тиждень: ' + name : 'Тиждень', 'Усього вилетів: ' + within.length];
+      const days = new Map();
+      for (const f of within) {
+        const d = new Date(f.lt || f.t);
+        const key = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+        if (!days.has(key)) days.set(key, []);
+        days.get(key).push(f);
+      }
+      let first = true;
+      for (const key of [...days.keys()].sort()) {
+        const arr = days.get(key);
+        const d = new Date(arr[0].lt || arr[0].t);
+        const wd = d.toLocaleDateString('uk-UA', { weekday: 'short' });
+        if (!first) lines.push('');
+        first = false;
+        lines.push(pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + ' (' + wd + '): ' + arr.length);
+        for (const f of arr) lines.push('  ' + sortieLine(f));
+      }
+      if (c && !activeRec) lines.push(c);
+      return lines.join('\n');
+    }
+
+    const lines = [];
+    if (name) lines.push(name);
+    if (takeoffStr)       lines.push('*Взліт*: ' + takeoffStr);
+    if (c)                lines.push('Коментарі: ' + c);
+    if (landingStr)       lines.push('*Сів*: ' + landingStr);
     if (lastFlightMs > 0) lines.push('В полете: ' + fmt(lastFlightMs));
-    if (c) lines.push('Коментарі: ' + c);
     return lines.join('\n');
   }
 
@@ -1122,7 +1213,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
     const text = buildText();
     if (navigator.share) {
       $('#share').disabled = true;
-      try { await navigator.share({ title: $('#callsign').value.trim() || 'Копібара', text }); status('✓ Готово', 'ok'); }
+      try { await navigator.share({ title: $('#callsign').value.trim() || 'Звіт', text }); status('✓ Готово', 'ok'); }
       catch (e) { if (e && e.name === 'AbortError') status('Отменено', 'dim'); else await fallbackCopy(text); }
       finally { $('#share').disabled = false; }
     } else { await fallbackCopy(text); }
@@ -1135,6 +1226,28 @@ Object.defineProperty(exports, '__esModule', { value: true });
     catch (e) { status('Не удалось скопировать. Текст:\n\n' + text, 'err'); }
   }
   $('#copy').addEventListener('click', copyText);
+
+  // ---- попередній перегляд згенерованого звіту ----
+  function updatePreview() {
+    const t = buildText();
+    const pre = $('#preview');
+    if (!t) { pre.textContent = '(порожній звіт — введи назву, коментар або зроби виліт)'; pre.classList.add('empty'); return; }
+    pre.classList.remove('empty');
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    pre.innerHTML = t.split('\n').map(line => {
+      const m = line.match(/^\*(Взліт|Сів)\*(:.*)$/);
+      return m ? '<strong>' + m[1] + '</strong>' + esc(m[2]) : esc(line);
+    }).join('\n');
+  }
+  $('#previewbtn').addEventListener('click', () => {
+    const pre = $('#preview');
+    pre.hidden = !pre.hidden;
+    $('#previewbtn').textContent = pre.hidden ? 'Перегляд звіту' : 'Сховати звіт';
+    if (!pre.hidden) updatePreview();
+  });
+  // живе оновлення, поки перегляд відкритий
+  ['input', 'change', 'click'].forEach(ev =>
+    document.addEventListener(ev, () => { if (!$('#preview').hidden) updatePreview(); }));
 
   // ---- карта: вибір координат тапом, підстановка в коментар ----
   function loadLeaflet() {
@@ -1162,7 +1275,9 @@ Object.defineProperty(exports, '__esModule', { value: true });
     try { return mgrsPretty(mgrs.forward([lng, lat], 5)); }
     catch (e) { return lat.toFixed(6) + ', ' + lng.toFixed(6); }
   }
-  function setPick(lat, lng, acc) {
+  let pickSource = 'map';
+  function setPick(lat, lng, acc, src) {
+    pickSource = src || 'map';
     pickedCoords = toMGRS(lat, lng);
     if (!lmarker) lmarker = L.circleMarker([lat, lng], { radius: 8, color: '#c0392b', weight: 2, fillOpacity: 0.6 }).addTo(lmap);
     else lmarker.setLatLng([lat, lng]);
@@ -1177,8 +1292,11 @@ Object.defineProperty(exports, '__esModule', { value: true });
     catch (e) { $('#mapwrap').hidden = true; status(e.message, 'err'); return; }
     if (!lmap) {
       lmap = L.map('mapview', { zoomControl: false });
+      L.control.zoom({ position: 'bottomleft' }).addTo(lmap);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(lmap);
-      lmap.on('click', e => setPick(e.latlng.lat, e.latlng.lng));
+      fixedLayer = L.layerGroup().addTo(lmap); drawFixed();
+      antLayer = L.layerGroup().addTo(lmap);
+      lmap.on('click', e => { if (coneMode === 'target' && lmarker) setTarget(e.latlng.lat, e.latlng.lng); else setPick(e.latlng.lat, e.latlng.lng, null, 'map'); });
       lmap.setView([49.99, 36.23], 6);   // Харків / Україна за замовчуванням
       if (navigator.geolocation) navigator.geolocation.getCurrentPosition(
         p => lmap.setView([p.coords.latitude, p.coords.longitude], 13), () => {},
@@ -1189,12 +1307,18 @@ Object.defineProperty(exports, '__esModule', { value: true });
   }
   $('#map').addEventListener('click', openMap);
   $('#mapcancel').addEventListener('click', () => { $('#mapwrap').hidden = true; });
-  $('#mapuse').addEventListener('click', () => { if (pickedCoords) insertTemplate(pickedCoords); $('#mapwrap').hidden = true; });
+  $('#mapuse').addEventListener('click', () => {
+    if (pickedCoords) {
+      const dir = (coneMode === 'target' && targetLL) ? coneDir() : null;
+      insertTemplate(dir != null ? pickedCoords + ' · ' + deg(dir) : pickedCoords);
+    }
+    $('#mapwrap').hidden = true;
+  });
   $('#mapgps').addEventListener('click', () => {
     if (!navigator.geolocation) { $('#mapcoords').textContent = 'GPS недоступний'; return; }
     $('#mapcoords').textContent = 'Визначаю GPS…';
     navigator.geolocation.getCurrentPosition(
-      p => { const la = p.coords.latitude, lo = p.coords.longitude; if (lmap) lmap.setView([la, lo], 18); setPick(la, lo, p.coords.accuracy); },
+      p => { const la = p.coords.latitude, lo = p.coords.longitude; if (lmap) lmap.setView([la, lo], 18); setPick(la, lo, p.coords.accuracy, 'gps'); },
       err => { $('#mapcoords').textContent = 'GPS: ' + err.message; },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -1206,28 +1330,97 @@ Object.defineProperty(exports, '__esModule', { value: true });
     catch (e) { $('#mapcoords').textContent = pickedCoords; }
   });
 
-  // ---- компас + конус напрямку ----
+  // ---- компас, ціль, ручний азимут, конус, зафіксовані точки ----
   let heading = null, conePoly = null, compassOn = false;
-  const CONE_R = 120, CONE_HALF = 30;   // радіус конуса (м) і піврозхил (°)
+  let coneMode = 'compass', targetLL = null, targetMarker = null;   // 'compass' | 'target' | 'manual'
+  let manualAz = parseInt(store.get('kap_manualaz') || '0', 10);
+  let coneR = parseInt(store.get('kap_coner') || '120', 10);
+  let coneHalf = parseInt(store.get('kap_conehalf') || '30', 10);
+  let fixedLayer = null;
+  let fixedPts = loadFixed();
+
+  function loadFixed() {
+    try { const v = JSON.parse(store.get('kap_fixed') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  }
+  function saveFixed() { store.set('kap_fixed', JSON.stringify(fixedPts)); idbSet('kap_fixed', fixedPts); }
+  function conePoints(lat, lng, dir, r, half) {
+    const step = Math.max(2, half / 6), pts = [[lat, lng]];
+    for (let a = -half; a <= half + 0.001; a += step) pts.push(destPoint(lat, lng, (dir + a + 360) % 360, r));
+    pts.push([lat, lng]);
+    return pts;
+  }
+  function drawFixed() {
+    if (!fixedLayer) return;
+    fixedLayer.clearLayers();
+    for (const p of fixedPts) {
+      if (p.cone) L.polygon(conePoints(p.lat, p.lng, p.cone.dir, p.cone.r, p.cone.half),
+        { color: '#c0392b', weight: 1, fillColor: '#c0392b', fillOpacity: 0.18, interactive: false }).addTo(fixedLayer);
+      const col = p.src === 'gps' ? '#1f7a1f' : '#111111';
+      L.circleMarker([p.lat, p.lng], { radius: 6, color: col, weight: 2, fillColor: col, fillOpacity: 0.85 })
+        .bindTooltip(p.mgrs, { direction: 'top' }).addTo(fixedLayer);
+    }
+  }
+
+  function deg(x) { return String(Math.round((x + 360) % 360)).padStart(3, '0') + '°'; }
+  function fmtLen(m) { return m >= 1000 ? (m / 1000).toFixed(m % 1000 ? 1 : 0) + ' км' : m + ' м'; }
   function destPoint(lat, lng, brg, dist) {
     const R = 6371000, b = brg * Math.PI / 180, la1 = lat * Math.PI / 180, lo1 = lng * Math.PI / 180, d = dist / R;
     const la2 = Math.asin(Math.sin(la1) * Math.cos(d) + Math.cos(la1) * Math.sin(d) * Math.cos(b));
     const lo2 = lo1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la1), Math.cos(d) - Math.sin(la1) * Math.sin(la2));
     return [la2 * 180 / Math.PI, ((lo2 * 180 / Math.PI + 540) % 360) - 180];
   }
+  function bearing(la1, lo1, la2, lo2) {
+    const p1 = la1 * Math.PI / 180, p2 = la2 * Math.PI / 180, dl = (lo2 - lo1) * Math.PI / 180;
+    const y = Math.sin(dl) * Math.cos(p2), x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+  function distance(la1, lo1, la2, lo2) {
+    const R = 6371000, dp = (la2 - la1) * Math.PI / 180, dl = (lo2 - lo1) * Math.PI / 180;
+    const a = Math.sin(dp / 2) ** 2 + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.sin(dl / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+  function coneDir() {
+    if (coneMode === 'manual') return manualAz;
+    if (coneMode === 'target' && targetLL && lmarker) {
+      const ll = lmarker.getLatLng();
+      return bearing(ll.lat, ll.lng, targetLL.lat, targetLL.lng);
+    }
+    return heading;
+  }
+  function showBearing(dir) {
+    $('#mapbearing').textContent = (dir == null) ? '' : ' · ' + deg(dir);
+    if (dir != null && coneMode !== 'manual') {   // у режимах компас/ціль повзунок азимута показує напрям
+      $('#coneaz').value = Math.round(dir); $('#azval').textContent = Math.round(dir);
+    }
+  }
+  function currentConeR() {
+    if (coneMode === 'target' && targetLL && lmarker) {
+      const ll = lmarker.getLatLng();
+      return Math.max(20, distance(ll.lat, ll.lng, targetLL.lat, targetLL.lng));
+    }
+    return coneR;
+  }
   function updateCone() {
-    if (!lmap || !lmarker || heading == null) return;
-    const ll = lmarker.getLatLng(), pts = [[ll.lat, ll.lng]];
-    for (let a = -CONE_HALF; a <= CONE_HALF; a += 10) pts.push(destPoint(ll.lat, ll.lng, (heading + a + 360) % 360, CONE_R));
-    pts.push([ll.lat, ll.lng]);
+    if (!lmap || !lmarker) return;
+    const dir = coneDir();
+    if (dir == null) { showBearing(null); return; }
+    const ll = lmarker.getLatLng();
+    const pts = conePoints(ll.lat, ll.lng, dir, currentConeR(), coneHalf);
     if (!conePoly) conePoly = L.polygon(pts, { color: '#c0392b', weight: 1, fillColor: '#c0392b', fillOpacity: 0.25, interactive: false }).addTo(lmap);
     else conePoly.setLatLngs(pts);
+    showBearing(dir);
+  }
+  function setTarget(lat, lng) {
+    targetLL = L.latLng(lat, lng);
+    if (!targetMarker) targetMarker = L.circleMarker([lat, lng], { radius: 7, color: '#1f7a1f', weight: 2, fillOpacity: 0.6, interactive: false }).addTo(lmap);
+    else targetMarker.setLatLng([lat, lng]);
+    updateCone();
   }
   function onOrient(e) {
     let h = null;
     if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;   // iOS
     else if (typeof e.alpha === 'number') h = 360 - e.alpha;                       // Android (absolute)
-    if (h != null && !isNaN(h)) { heading = (h + 360) % 360; updateCone(); }
+    if (h != null && !isNaN(h)) { heading = (h + 360) % 360; if (coneMode === 'compass') updateCone(); }
   }
   async function startCompass() {
     if (compassOn) return;
@@ -1242,9 +1435,168 @@ Object.defineProperty(exports, '__esModule', { value: true });
     compassOn = true;
   }
 
+  // налаштування конуса + точки
+  function applyConeSettings() {
+    coneR = parseInt($('#conelen').value, 10);
+    coneHalf = parseInt($('#coneang').value, 10) / 2;
+    $('#lenval').textContent = fmtLen(coneR);
+    $('#angval').textContent = coneHalf * 2;
+    store.set('kap_coner', String(coneR)); idbSet('kap_coner', String(coneR));
+    store.set('kap_conehalf', String(coneHalf)); idbSet('kap_conehalf', String(coneHalf));
+    updateCone();
+  }
+  $('#conelen').addEventListener('input', applyConeSettings);
+  $('#coneang').addEventListener('input', applyConeSettings);
+  $('#coneaz').addEventListener('input', () => {
+    coneMode = 'manual';
+    manualAz = parseInt($('#coneaz').value, 10);
+    $('#azval').textContent = manualAz;
+    store.set('kap_manualaz', String(manualAz)); idbSet('kap_manualaz', String(manualAz));
+    $('#conetarget').textContent = 'Ціль: вимк';
+    updateCone();
+  });
+  $('#conecompass').addEventListener('click', () => {
+    coneMode = 'compass';
+    $('#conetarget').textContent = 'Ціль: вимк';
+    startCompass();
+    updateCone();
+  });
+  $('#mapcone').addEventListener('click', () => { $('#maptune').hidden = !$('#maptune').hidden; });
+  $('#conetarget').addEventListener('click', () => {
+    coneMode = (coneMode === 'target') ? 'compass' : 'target';
+    $('#conetarget').textContent = 'Ціль: ' + (coneMode === 'target' ? 'увімк' : 'вимк');
+    if (coneMode === 'target') $('#mapcoords').textContent = 'Тапни ціль на мапі';
+    updateCone();
+  });
+  let multiCone = store.get('kap_multicone') === '1';
+  $('#mapfix').addEventListener('click', () => {
+    if (!lmarker || !pickedCoords) return;
+    const ll = lmarker.getLatLng();
+    const fp = { lat: ll.lat, lng: ll.lng, mgrs: pickedCoords, src: pickSource };
+    const dir = coneDir();
+    if (multiCone && dir != null) fp.cone = { dir, r: currentConeR(), half: coneHalf };
+    fixedPts.push(fp);
+    saveFixed(); drawFixed();
+    $('#mapcoords').textContent = '✓ зафіксовано: ' + pickedCoords;
+  });
+  $('#conemulti').checked = multiCone;
+  $('#conemulti').addEventListener('change', () => {
+    multiCone = $('#conemulti').checked;
+    store.set('kap_multicone', multiCone ? '1' : '0'); idbSet('kap_multicone', multiCone ? '1' : '0');
+  });
+
+  // ---- антена: сектор покриття з урахуванням рельєфу (онлайн Terrain-RGB) ----
+  const DEM_Z = 12;
+  const ANT_COLORS = ['#1f5fb8', '#1f7a1f', '#b8431f', '#7a1f7a', '#1f7a7a', '#9a7d0a'];
+  const tileData = new Map();
+  let antLayer = null, antennas = [];
+  function lon2tile(lon, z) { return (lon + 180) / 360 * Math.pow(2, z); }
+  function lat2tile(lat, z) { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z); }
+  function getTile(z, x, y) {
+    const key = z + '/' + x + '/' + y;
+    if (tileData.has(key)) return Promise.resolve();
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+          c.getContext('2d').drawImage(img, 0, 0);
+          tileData.set(key, c.getContext('2d').getImageData(0, 0, 256, 256).data); res();
+        } catch (e) { rej(e); }
+      };
+      img.onerror = () => rej(new Error('tile'));
+      img.src = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/' + z + '/' + x + '/' + y + '.png';
+    });
+  }
+  async function demPrefetch(latC, lngC, rangeM) {
+    const dLat = rangeM / 111320, dLng = rangeM / (111320 * Math.cos(latC * Math.PI / 180)), z = DEM_Z;
+    const xs = [Math.floor(lon2tile(lngC - dLng, z)), Math.floor(lon2tile(lngC + dLng, z))];
+    const ys = [Math.floor(lat2tile(latC + dLat, z)), Math.floor(lat2tile(latC - dLat, z))];
+    const jobs = [];
+    for (let x = Math.min(...xs); x <= Math.max(...xs); x++)
+      for (let y = Math.min(...ys); y <= Math.max(...ys); y++) jobs.push(getTile(z, x, y));
+    await Promise.all(jobs);
+  }
+  function elevSync(lat, lng) {
+    const z = DEM_Z, xf = lon2tile(lng, z), yf = lat2tile(lat, z);
+    const x = Math.floor(xf), y = Math.floor(yf);
+    const d = tileData.get(z + '/' + x + '/' + y); if (!d) return null;
+    const px = Math.min(255, Math.floor((xf - x) * 256)), py = Math.min(255, Math.floor((yf - y) * 256));
+    const i = (py * 256 + px) * 4;
+    return (d[i] * 256 + d[i + 1] + d[i + 2] / 256) - 32768;
+  }
+  // межа прямої видимості по кожному азимуту з кривизною 4/3 + Френель
+  async function buildSector(lat, lng, azC, half, range, antH, tgtH, freq) {
+    await demPrefetch(lat, lng, range);
+    const k = 1.33, R = 6371000, lam = freq > 0 ? 299792458 / (freq * 1e6) : 0;
+    const g0 = elevSync(lat, lng); if (g0 == null) return null;
+    const Hobs = g0 + antH, step = Math.max(30, range / 300);
+    const pts = [[lat, lng]];
+    for (let az = azC - half; az <= azC + half + 0.001; az += Math.max(2, half / 12)) {
+      const A = (az + 360) % 360;
+      let maxAng = -Infinity, reach = range;
+      for (let d = step; d <= range; d += step) {
+        const p = destPoint(lat, lng, A, d);
+        const t = elevSync(p[0], p[1]); if (t == null) { reach = d - step; break; }
+        const curv = d * d / (2 * k * R);
+        const fres = lam > 0 ? 0.6 * Math.sqrt(lam * d * Math.max(1, range - d) / range) : 0;
+        const angTerr = ((t + fres - curv) - Hobs) / d;   // перешкода (із запасом Френеля)
+        const angTgt = ((t + tgtH - curv) - Hobs) / d;    // ціль на цій дальності
+        if (angTgt < maxAng) { reach = d - step; break; }
+        if (angTerr > maxAng) maxAng = angTerr;
+      }
+      pts.push(destPoint(lat, lng, A, Math.max(step, reach)));
+    }
+    return pts;
+  }
+  $('#antbuild').addEventListener('click', async () => {
+    if (!lmarker || !pickedCoords) { $('#mapcoords').textContent = 'Спочатку постав точку'; return; }
+    const az = coneDir();
+    if (az == null) { $('#mapcoords').textContent = 'Задай азимут (Компас або повзунок Азимут)'; return; }
+    const ll = lmarker.getLatLng();
+    const antH = parseFloat($('#anth').value) || 0, tgtH = parseFloat($('#tgth').value) || 0, freq = parseFloat($('#antfreq').value) || 0;
+    $('#antbuild').disabled = true; $('#mapcoords').textContent = 'Рахую рельєф…';
+    try {
+      const poly = await buildSector(ll.lat, ll.lng, az, coneHalf, coneR, antH, tgtH, freq);
+      if (!poly) { $('#mapcoords').textContent = 'Нема даних висот'; return; }
+      const col = ANT_COLORS[antennas.length % ANT_COLORS.length];
+      L.polygon(poly, { color: col, weight: 1, fillColor: col, fillOpacity: 0.3, interactive: false }).addTo(antLayer);
+      L.circleMarker([ll.lat, ll.lng], { radius: 6, color: col, weight: 2, fillColor: col, fillOpacity: 0.9 })
+        .bindTooltip(pickedCoords + ' · ' + deg(az) + ' · ' + antH + 'м', { direction: 'top' }).addTo(antLayer);
+      antennas.push({ lat: ll.lat, lng: ll.lng, az, col });
+      $('#mapcoords').textContent = '✓ антена ' + deg(az) + ' · ' + fmtLen(coneR);
+    } catch (e) {
+      $('#mapcoords').textContent = 'Рельєф недоступний (мережа/CORS)';
+    } finally { $('#antbuild').disabled = false; }
+  });
+  $('#antclear').addEventListener('click', () => { if (antLayer) antLayer.clearLayers(); antennas = []; });
+  $('#fixclear').addEventListener('click', () => { fixedPts = []; saveFixed(); drawFixed(); });
+  // початкові значення повзунків
+  $('#conelen').value = coneR; $('#coneang').value = coneHalf * 2; $('#coneaz').value = manualAz;
+  $('#lenval').textContent = fmtLen(coneR); $('#angval').textContent = coneHalf * 2; $('#azval').textContent = manualAz;
+
   // ---- PWA: service worker + встановлення ----
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    const hadController = !!navigator.serviceWorker.controller;
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || refreshing) return;   // перший запуск — без перезавантаження
+      refreshing = true;
+      location.reload();
+    });
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        reg.update().catch(() => {});
+        setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);  // періодична перевірка
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          if (nw) nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) nw.postMessage('skipWaiting');
+          });
+        });
+      }).catch(() => {});
+    });
   }
   let deferredPrompt = null;
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; $('#install').hidden = false; });
@@ -1277,9 +1629,8 @@ Object.defineProperty(exports, '__esModule', { value: true });
   function flush() {
     const f = JSON.stringify(flights);
     const nm = $('#callsign').value;
-    const sh = $('#shift').checked ? '1' : '0';
-    store.set('kap_flights', f); store.set('kap_name', nm); store.set('kap_shift', sh);
-    idbSet('kap_flights', flights); idbSet('kap_name', nm); idbSet('kap_shift', sh);
+    store.set('kap_flights', f); store.set('kap_name', nm); store.set('kap_reportmode', reportMode);
+    idbSet('kap_flights', flights); idbSet('kap_name', nm); idbSet('kap_reportmode', reportMode);
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
   window.addEventListener('pagehide', flush);
@@ -1288,14 +1639,14 @@ Object.defineProperty(exports, '__esModule', { value: true });
   // ---- загрузка из IndexedDB (приоритет у более полной записи) ----
   (async function initDB() {
     try {
-      const [f, nm, sh] = await Promise.all([idbGet('kap_flights'), idbGet('kap_name'), idbGet('kap_shift')]);
+      const [f, nm, rm] = await Promise.all([idbGet('kap_flights'), idbGet('kap_name'), idbGet('kap_reportmode')]);
       const tpl = await idbGet('kap_templates');
       if (Array.isArray(f) && f.length >= flights.length) {
         flights = f.map(x => ({ t: x.t, c: x.c || '', lt: x.lt }));
       }
       if (Array.isArray(tpl) && !store.get('kap_templates')) { templates = tpl; renderTemplates(); }
       if (typeof nm === 'string' && !store.get('kap_name')) $('#callsign').value = nm;
-      if (sh === '1' && store.get('kap_shift') == null) $('#shift').checked = true;
+      if (typeof rm === 'string' && store.get('kap_reportmode') == null) setMode(rm);
     } catch (e) {}
     nameToggleLabel(); saveFlights(); renderStats();
   })();
