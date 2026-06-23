@@ -1168,6 +1168,8 @@ Object.defineProperty(exports, '__esModule', { value: true });
     else lmarker.setLatLng([lat, lng]);
     $('#mapcoords').textContent = pickedCoords + (acc ? ' · ±' + Math.round(acc) + ' м' : '');
     $('#mapuse').disabled = false;
+    startCompass();
+    updateCone();
   }
   async function openMap() {
     $('#mapwrap').hidden = false;
@@ -1192,7 +1194,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
     if (!navigator.geolocation) { $('#mapcoords').textContent = 'GPS недоступний'; return; }
     $('#mapcoords').textContent = 'Визначаю GPS…';
     navigator.geolocation.getCurrentPosition(
-      p => { const la = p.coords.latitude, lo = p.coords.longitude; if (lmap) lmap.setView([la, lo], 16); setPick(la, lo, p.coords.accuracy); },
+      p => { const la = p.coords.latitude, lo = p.coords.longitude; if (lmap) lmap.setView([la, lo], 18); setPick(la, lo, p.coords.accuracy); },
       err => { $('#mapcoords').textContent = 'GPS: ' + err.message; },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -1203,6 +1205,42 @@ Object.defineProperty(exports, '__esModule', { value: true });
     try { await navigator.clipboard.writeText(pickedCoords); $('#mapcoords').textContent = '✓ ' + pickedCoords; }
     catch (e) { $('#mapcoords').textContent = pickedCoords; }
   });
+
+  // ---- компас + конус напрямку ----
+  let heading = null, conePoly = null, compassOn = false;
+  const CONE_R = 120, CONE_HALF = 30;   // радіус конуса (м) і піврозхил (°)
+  function destPoint(lat, lng, brg, dist) {
+    const R = 6371000, b = brg * Math.PI / 180, la1 = lat * Math.PI / 180, lo1 = lng * Math.PI / 180, d = dist / R;
+    const la2 = Math.asin(Math.sin(la1) * Math.cos(d) + Math.cos(la1) * Math.sin(d) * Math.cos(b));
+    const lo2 = lo1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la1), Math.cos(d) - Math.sin(la1) * Math.sin(la2));
+    return [la2 * 180 / Math.PI, ((lo2 * 180 / Math.PI + 540) % 360) - 180];
+  }
+  function updateCone() {
+    if (!lmap || !lmarker || heading == null) return;
+    const ll = lmarker.getLatLng(), pts = [[ll.lat, ll.lng]];
+    for (let a = -CONE_HALF; a <= CONE_HALF; a += 10) pts.push(destPoint(ll.lat, ll.lng, (heading + a + 360) % 360, CONE_R));
+    pts.push([ll.lat, ll.lng]);
+    if (!conePoly) conePoly = L.polygon(pts, { color: '#c0392b', weight: 1, fillColor: '#c0392b', fillOpacity: 0.25, interactive: false }).addTo(lmap);
+    else conePoly.setLatLngs(pts);
+  }
+  function onOrient(e) {
+    let h = null;
+    if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;   // iOS
+    else if (typeof e.alpha === 'number') h = 360 - e.alpha;                       // Android (absolute)
+    if (h != null && !isNaN(h)) { heading = (h + 360) % 360; updateCone(); }
+  }
+  async function startCompass() {
+    if (compassOn) return;
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const r = await DeviceOrientationEvent.requestPermission();   // iOS 13+ потребує дозволу
+        if (r !== 'granted') return;
+      }
+    } catch (e) {}
+    if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onOrient, true);
+    else window.addEventListener('deviceorientation', onOrient, true);
+    compassOn = true;
+  }
 
   // ---- PWA: service worker + встановлення ----
   if ('serviceWorker' in navigator) {
