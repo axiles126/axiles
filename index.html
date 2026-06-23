@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Report</title>
+<title></title>
 <meta name="theme-color" content="#ffffff">
 <link rel="manifest" href="manifest.webmanifest">
 <script>
@@ -931,6 +931,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
     <label>Довжина <span id="lenval">120 м</span><input type="range" id="conelen" min="20" max="15000" step="50" value="120"></label>
     <label>Кут <span id="angval">60</span>°<input type="range" id="coneang" min="10" max="160" step="5" value="60"></label>
     <label>Азимут <span id="azval">0</span>°<input type="range" id="coneaz" min="0" max="359" step="1" value="0"></label>
+    <label class="check"><input type="checkbox" id="coneshow"><span>Показувати конус</span></label>
     <label class="check"><input type="checkbox" id="conemulti"><span>Кілька конусів</span></label>
     <label>Частота <input type="number" id="antfreq" min="100" max="60000" step="10" placeholder="МГц"></label>
     <label>Вис. ант. <input type="number" id="anth" min="0" max="500" step="1" value="2"></label>
@@ -1336,6 +1337,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
   let manualAz = parseInt(store.get('kap_manualaz') || '0', 10);
   let coneR = parseInt(store.get('kap_coner') || '120', 10);
   let coneHalf = parseInt(store.get('kap_conehalf') || '30', 10);
+  let coneOn = store.get('kap_coneon') === '1';   // конус за замовчуванням вимкнено
   let fixedLayer = null;
   let fixedPts = loadFixed();
 
@@ -1402,6 +1404,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
   }
   function updateCone() {
     if (!lmap || !lmarker) return;
+    if (!coneOn) { if (conePoly) { lmap.removeLayer(conePoly); conePoly = null; } showBearing(null); return; }
     const dir = coneDir();
     if (dir == null) { showBearing(null); return; }
     const ll = lmarker.getLatLng();
@@ -1483,6 +1486,12 @@ Object.defineProperty(exports, '__esModule', { value: true });
   $('#conemulti').addEventListener('change', () => {
     multiCone = $('#conemulti').checked;
     store.set('kap_multicone', multiCone ? '1' : '0'); idbSet('kap_multicone', multiCone ? '1' : '0');
+  });
+  $('#coneshow').checked = coneOn;
+  $('#coneshow').addEventListener('change', () => {
+    coneOn = $('#coneshow').checked;
+    store.set('kap_coneon', coneOn ? '1' : '0'); idbSet('kap_coneon', coneOn ? '1' : '0');
+    updateCone();
   });
 
   // ---- антена: сектор покриття з урахуванням рельєфу (онлайн Terrain-RGB) ----
