@@ -823,7 +823,14 @@ Object.defineProperty(exports, '__esModule', { value: true });
   #mapwrap { position:fixed; inset:0; z-index:1000; background:#fff; display:flex; flex-direction:column; }
   #mapwrap[hidden] { display:none; }
   #mapbar { display:flex; flex-direction:column; gap:6px; padding:10px 14px; border-bottom:1px solid var(--line); }
-  #mapcoords { font-size:13px; color:var(--fg); font-variant-numeric:tabular-nums; }
+  #mapinfo { font-size:13px; color:var(--fg); font-variant-numeric:tabular-nums; }
+  #mapbearing { color:var(--err); }
+  #maptune { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding-top:4px; }
+  #maptune[hidden] { display:none; }
+  #maptune label { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--dim); margin:0; }
+  #maptune input[type=range] { width:110px; accent-color:#111; }
+  #conetarget { padding:4px 8px; background:transparent; border:1px solid var(--line); color:var(--fg);
+                font:inherit; font-size:11px; cursor:pointer; text-transform:none; letter-spacing:0; }
   #mapbtns { display:flex; flex-wrap:wrap; gap:4px; }
   #mapbtns button { padding:8px 8px; background:transparent; border:none; color:var(--fg);
                     font-weight:600; text-transform:uppercase; letter-spacing:.5px; font-size:13px; }
@@ -876,13 +883,19 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 <div id="mapwrap" hidden>
   <div id="mapbar">
-    <div id="mapcoords">Тапни на мапі</div>
+    <div id="mapinfo"><span id="mapcoords">Тапни на мапі</span><span id="mapbearing"></span></div>
     <div id="mapbtns">
       <button id="mapgps">GPS</button>
       <button id="mapcenter">Центр</button>
       <button id="mapcopy">Копі</button>
+      <button id="mapcone">Конус</button>
       <button id="mapcancel">Закрити</button>
       <button id="mapuse" disabled>Вставити</button>
+    </div>
+    <div id="maptune" hidden>
+      <label>Довжина <span id="lenval">120</span>м<input type="range" id="conelen" min="20" max="1000" step="10" value="120"></label>
+      <label>Кут <span id="angval">60</span>°<input type="range" id="coneang" min="10" max="160" step="5" value="60"></label>
+      <button id="conetarget">Ціль: вимк</button>
     </div>
   </div>
   <div id="mapview"></div>
@@ -1178,7 +1191,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
     if (!lmap) {
       lmap = L.map('mapview', { zoomControl: false });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(lmap);
-      lmap.on('click', e => setPick(e.latlng.lat, e.latlng.lng));
+      lmap.on('click', e => { if (coneMode === 'target' && lmarker) setTarget(e.latlng.lat, e.latlng.lng); else setPick(e.latlng.lat, e.latlng.lng); });
       lmap.setView([49.99, 36.23], 6);   // Харків / Україна за замовчуванням
       if (navigator.geolocation) navigator.geolocation.getCurrentPosition(
         p => lmap.setView([p.coords.latitude, p.coords.longitude], 13), () => {},
@@ -1189,7 +1202,13 @@ Object.defineProperty(exports, '__esModule', { value: true });
   }
   $('#map').addEventListener('click', openMap);
   $('#mapcancel').addEventListener('click', () => { $('#mapwrap').hidden = true; });
-  $('#mapuse').addEventListener('click', () => { if (pickedCoords) insertTemplate(pickedCoords); $('#mapwrap').hidden = true; });
+  $('#mapuse').addEventListener('click', () => {
+    if (pickedCoords) {
+      const dir = (coneMode === 'target' && targetLL) ? coneDir() : null;
+      insertTemplate(dir != null ? pickedCoords + ' · ' + deg(dir) : pickedCoords);
+    }
+    $('#mapwrap').hidden = true;
+  });
   $('#mapgps').addEventListener('click', () => {
     if (!navigator.geolocation) { $('#mapcoords').textContent = 'GPS недоступний'; return; }
     $('#mapcoords').textContent = 'Визначаю GPS…';
@@ -1206,28 +1225,63 @@ Object.defineProperty(exports, '__esModule', { value: true });
     catch (e) { $('#mapcoords').textContent = pickedCoords; }
   });
 
-  // ---- компас + конус напрямку ----
+  // ---- компас, ціль та конус напрямку ----
   let heading = null, conePoly = null, compassOn = false;
-  const CONE_R = 120, CONE_HALF = 30;   // радіус конуса (м) і піврозхил (°)
+  let coneMode = 'compass', targetLL = null, targetMarker = null;
+  let coneR = parseInt(store.get('kap_coner') || '120', 10);
+  let coneHalf = parseInt(store.get('kap_conehalf') || '30', 10);
+
+  function deg(x) { return String(Math.round((x + 360) % 360)).padStart(3, '0') + '°'; }
   function destPoint(lat, lng, brg, dist) {
     const R = 6371000, b = brg * Math.PI / 180, la1 = lat * Math.PI / 180, lo1 = lng * Math.PI / 180, d = dist / R;
     const la2 = Math.asin(Math.sin(la1) * Math.cos(d) + Math.cos(la1) * Math.sin(d) * Math.cos(b));
     const lo2 = lo1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la1), Math.cos(d) - Math.sin(la1) * Math.sin(la2));
     return [la2 * 180 / Math.PI, ((lo2 * 180 / Math.PI + 540) % 360) - 180];
   }
+  function bearing(la1, lo1, la2, lo2) {
+    const p1 = la1 * Math.PI / 180, p2 = la2 * Math.PI / 180, dl = (lo2 - lo1) * Math.PI / 180;
+    const y = Math.sin(dl) * Math.cos(p2), x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+  function distance(la1, lo1, la2, lo2) {
+    const R = 6371000, dp = (la2 - la1) * Math.PI / 180, dl = (lo2 - lo1) * Math.PI / 180;
+    const a = Math.sin(dp / 2) ** 2 + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.sin(dl / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+  function coneDir() {
+    if (coneMode === 'target' && targetLL && lmarker) {
+      const ll = lmarker.getLatLng();
+      return bearing(ll.lat, ll.lng, targetLL.lat, targetLL.lng);
+    }
+    return heading;
+  }
+  function showBearing(dir) { $('#mapbearing').textContent = (dir == null) ? '' : ' · ' + deg(dir); }
+
   function updateCone() {
-    if (!lmap || !lmarker || heading == null) return;
-    const ll = lmarker.getLatLng(), pts = [[ll.lat, ll.lng]];
-    for (let a = -CONE_HALF; a <= CONE_HALF; a += 10) pts.push(destPoint(ll.lat, ll.lng, (heading + a + 360) % 360, CONE_R));
+    if (!lmap || !lmarker) return;
+    const dir = coneDir();
+    if (dir == null) { showBearing(null); return; }
+    const ll = lmarker.getLatLng();
+    let r = coneR;
+    if (coneMode === 'target' && targetLL) r = Math.max(20, distance(ll.lat, ll.lng, targetLL.lat, targetLL.lng));
+    const step = Math.max(2, coneHalf / 6), pts = [[ll.lat, ll.lng]];
+    for (let a = -coneHalf; a <= coneHalf + 0.001; a += step) pts.push(destPoint(ll.lat, ll.lng, (dir + a + 360) % 360, r));
     pts.push([ll.lat, ll.lng]);
     if (!conePoly) conePoly = L.polygon(pts, { color: '#c0392b', weight: 1, fillColor: '#c0392b', fillOpacity: 0.25, interactive: false }).addTo(lmap);
     else conePoly.setLatLngs(pts);
+    showBearing(dir);
+  }
+  function setTarget(lat, lng) {
+    targetLL = L.latLng(lat, lng);
+    if (!targetMarker) targetMarker = L.circleMarker([lat, lng], { radius: 7, color: '#1f7a1f', weight: 2, fillOpacity: 0.6, interactive: false }).addTo(lmap);
+    else targetMarker.setLatLng([lat, lng]);
+    updateCone();
   }
   function onOrient(e) {
     let h = null;
     if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;   // iOS
     else if (typeof e.alpha === 'number') h = 360 - e.alpha;                       // Android (absolute)
-    if (h != null && !isNaN(h)) { heading = (h + 360) % 360; updateCone(); }
+    if (h != null && !isNaN(h)) { heading = (h + 360) % 360; if (coneMode !== 'target') updateCone(); }
   }
   async function startCompass() {
     if (compassOn) return;
@@ -1242,9 +1296,49 @@ Object.defineProperty(exports, '__esModule', { value: true });
     compassOn = true;
   }
 
+  // налаштування конуса: повзунки довжини/кута + режим цілі
+  function applyConeSettings() {
+    coneR = parseInt($('#conelen').value, 10);
+    coneHalf = parseInt($('#coneang').value, 10) / 2;
+    $('#lenval').textContent = coneR;
+    $('#angval').textContent = coneHalf * 2;
+    store.set('kap_coner', String(coneR)); idbSet('kap_coner', String(coneR));
+    store.set('kap_conehalf', String(coneHalf)); idbSet('kap_conehalf', String(coneHalf));
+    updateCone();
+  }
+  $('#conelen').addEventListener('input', applyConeSettings);
+  $('#coneang').addEventListener('input', applyConeSettings);
+  $('#mapcone').addEventListener('click', () => { $('#maptune').hidden = !$('#maptune').hidden; });
+  $('#conetarget').addEventListener('click', () => {
+    coneMode = (coneMode === 'target') ? 'compass' : 'target';
+    $('#conetarget').textContent = 'Ціль: ' + (coneMode === 'target' ? 'увімк' : 'вимк');
+    if (coneMode === 'target') $('#mapcoords').textContent = 'Тапни ціль на мапі';
+    updateCone();
+  });
+  $('#conelen').value = coneR; $('#coneang').value = coneHalf * 2;
+  $('#lenval').textContent = coneR; $('#angval').textContent = coneHalf * 2;
+
   // ---- PWA: service worker + встановлення ----
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    const hadController = !!navigator.serviceWorker.controller;
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || refreshing) return;   // перший запуск — без перезавантаження
+      refreshing = true;
+      location.reload();
+    });
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        reg.update().catch(() => {});
+        setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);  // періодична перевірка
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          if (nw) nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) nw.postMessage('skipWaiting');
+          });
+        });
+      }).catch(() => {});
+    });
   }
   let deferredPrompt = null;
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; $('#install').hidden = false; });
