@@ -1189,10 +1189,10 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
     const lines = [];
     if (name) lines.push(name);
-    if (takeoffStr)       lines.push('Взліт: ' + takeoffStr);
-    if (landingStr)       lines.push('Сів: ' + landingStr);
+    if (takeoffStr)       lines.push('*Взліт*: ' + takeoffStr);
+    if (c)                lines.push('Коментарі: ' + c);
+    if (landingStr)       lines.push('*Сів*: ' + landingStr);
     if (lastFlightMs > 0) lines.push('В полете: ' + fmt(lastFlightMs));
-    if (c) lines.push('Коментарі: ' + c);
     return lines.join('\n');
   }
 
@@ -1221,8 +1221,14 @@ Object.defineProperty(exports, '__esModule', { value: true });
   // ---- попередній перегляд згенерованого звіту ----
   function updatePreview() {
     const t = buildText();
-    $('#preview').textContent = t || '(порожній звіт — введи назву, коментар або зроби виліт)';
-    $('#preview').classList.toggle('empty', !t);
+    const pre = $('#preview');
+    if (!t) { pre.textContent = '(порожній звіт — введи назву, коментар або зроби виліт)'; pre.classList.add('empty'); return; }
+    pre.classList.remove('empty');
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    pre.innerHTML = t.split('\n').map(line => {
+      const m = line.match(/^\*(Взліт|Сів)\*(:.*)$/);
+      return m ? '<strong>' + m[1] + '</strong>' + esc(m[2]) : esc(line);
+    }).join('\n');
   }
   $('#previewbtn').addEventListener('click', () => {
     const pre = $('#preview');
